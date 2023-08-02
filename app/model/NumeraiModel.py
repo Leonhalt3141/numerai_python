@@ -1,14 +1,21 @@
 import gc
 import glob
+import logging
 import pickle
 
 import joblib
 import numpy as np
+import pandas as pd
+import scipy.stats as st
 from sklearn.model_selection import KFold
 from tqdm import tqdm
 from xgboost import XGBRegressor
 
+from app.numerai_sbumit import submit
+
 from .base_model import NumeraiBaseEstimator
+
+logger = logging.getLogger()
 
 
 class NumeraiModel(NumeraiBaseEstimator):
@@ -16,6 +23,7 @@ class NumeraiModel(NumeraiBaseEstimator):
         self,
         train_data_path: str,
         live_data_path: str,
+        valid_data_path: str,
         fold_num: int = 5,
         sample_ratio: float = 0.1,
         target_col: str = "target",
@@ -39,18 +47,19 @@ class NumeraiModel(NumeraiBaseEstimator):
             self.xgboost_params = xgboost_params
 
         self.list_feature_cols_file = "list_feature_cols.pkl"
+        self.drop_cols = None
 
-        super().__init__(train_data_path, live_data_path)
+        super().__init__(train_data_path, live_data_path, valid_data_path)
 
     def train_model(self):
         np.random.seed(0)
 
         train_df = self.load_data(self.train_data_path)
 
-        drop_cols = [
+        self.drop_cols = [
             col for col in train_df.columns if "target" in col and col != "target"
         ]
-        train_df.drop(drop_cols, axis=1, inplace=True)
+        train_df.drop(self.drop_cols, axis=1, inplace=True)
         train_df.fillna(0, inplace=True)
 
         feature_cols = [col for col in train_df.columns if "feature" in col][:1205]
@@ -63,7 +72,7 @@ class NumeraiModel(NumeraiBaseEstimator):
         ):
             if fold != 1:
                 train_df = self.load_data(self.train_data_path)
-                train_df.drop(drop_cols, axis=1, inplace=True)
+                train_df.drop(self.drop_cols, axis=1, inplace=True)
                 train_df.fillna(0, inplace=True)
 
             train_size = int(trn_idx.shape[0] * self.sample_ratio)
@@ -105,3 +114,66 @@ class NumeraiModel(NumeraiBaseEstimator):
 
         for path in glob.glob("model.lgb.fold_*.pkl"):
             models.append(pickle.load(open(path, "rb")))
+
+        valid = self.load_data(self.valid_data_path)
+        valid.drop(self.drop_cols, axis=1, inplace=True)
+        valid.fillna(0, inplace=True)
+
+        preds_valid = np.zeros(valid.shape[0])
+        logger.info("Predicting")
+        chunk_size = 200000
+        chunk_total = len(valid) // chunk_size + 1
+
+        for i, model in tqdm(enumerate(models), total=len(models), position=0):
+            for chunk_num in tqdm(
+                range(chunk_total), total=chunk_total, position=1, leave=False
+            ):
+                start_index = chunk_num * chunk_size
+                end_index = min(chunk_num * chunk_size + chunk_size, len(valid))
+                chunk = valid[start_index:end_index]
+                preds_valid[start_index:end_index] += model.predict(
+                    chunk[features].values
+                ) / len(models)
+
+        valid["prediction"] = preds_valid
+
+        d = {}
+        for era in tqdm(sorted(set(valid["era"]))):
+            d[era] = st.spearmanr(
+                valid.query("era == @era")["prediction"],
+                valid.query("era == @era")["target"],
+            )[0]
+
+        s = pd.Series(d)
+        mean = s.mean()
+        std = s.std()
+        sharpe_ratio = mean / std
+        logger.info(
+            f"Mean: {round(mean, 3)}, S.D.: {round(std, 3)}, Sharpe ratio: {round(sharpe_ratio, 3)}"
+        )
+
+        return models, features, valid, preds_valid
+
+    def submission(self, models, features, valid, preds_valid, flag_submit):
+        live = pd.read_parquet(self.live_data_path)
+        preds_live = np.zeros(live.shape[0])
+        feature_data = live[features].values
+
+        for model in models:
+            preds_live += model.predict(feature_data) / len(models)
+
+        submit(live, preds_live, valid, preds_valid, flag_submit=flag_submit)
+
+    def prediction_submit_pipeline(self):
+        logger.info("Prediction with validation data")
+        models, features, valid, preds_valid = self.valid_data_prediction()
+        features = pickle.load(open("list_feature_cols.pkl", "rb"))
+
+        models = []
+
+        for path in glob.glob("model.lgb.fold_*.pkl"):
+            models.append(pickle.load(open(path, "rb")))
+
+        logger.info("Submission")
+        self.submission(models, features, valid, preds_valid, "valid,live")
+        logger.info("Complete")
