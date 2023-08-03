@@ -39,7 +39,7 @@ class NumeraiModel(NumeraiBaseEstimator):
                 "learning_rate": 0.01,
                 "metric": "rmse",
                 "max_bin": 5,
-                "colsample_bytree": 0.1,
+                "colsample_bytree": 0.5,
                 "seed": 0,
                 "force_row_wise": True,
             }
