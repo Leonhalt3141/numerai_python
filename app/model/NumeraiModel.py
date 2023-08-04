@@ -25,13 +25,15 @@ class NumeraiModel(NumeraiBaseEstimator):
         live_data_path: str,
         valid_data_path: str,
         fold_num: int = 5,
-        sample_ratio: float = 0.1,
+        sample_ratio: float = 0.5,
+        chunk_size=200000,
         target_col: str = "target",
         xgboost_params: dict = None,
     ):
         self.fold_num = fold_num
         self.sample_ratio = sample_ratio
         self.target_col = target_col
+        self.chunk_size = chunk_size
         if xgboost_params is None:
             self.xgboost_params = {
                 "n_estimators": 3000,
@@ -39,7 +41,7 @@ class NumeraiModel(NumeraiBaseEstimator):
                 "learning_rate": 0.01,
                 "metric": "rmse",
                 "max_bin": 5,
-                "colsample_bytree": 0.5,
+                "colsample_bytree": 0.4,
                 "seed": 0,
                 "force_row_wise": True,
             }
@@ -51,16 +53,20 @@ class NumeraiModel(NumeraiBaseEstimator):
 
         super().__init__(train_data_path, live_data_path, valid_data_path)
 
+    def filter_df(self, df, drop_cols):
+        df.drop(drop_cols, axis=1, inplace=True)
+        df.fillna(0, inplace=True)
+
     def train_model(self):
         np.random.seed(0)
 
         train_df = self.load_data(self.train_data_path)
+        size = train_df.shape[0]
 
         self.drop_cols = [
             col for col in train_df.columns if "target" in col and col != "target"
         ]
-        train_df.drop(self.drop_cols, axis=1, inplace=True)
-        train_df.fillna(0, inplace=True)
+        self.filter_df(train_df, self.drop_cols)
 
         feature_cols = [col for col in train_df.columns if "feature" in col][:1205]
         pickle.dump(feature_cols, open(self.list_feature_cols_file, "wb"))
@@ -72,11 +78,10 @@ class NumeraiModel(NumeraiBaseEstimator):
         ):
             if fold != 1:
                 train_df = self.load_data(self.train_data_path)
-                train_df.drop(self.drop_cols, axis=1, inplace=True)
-                train_df.fillna(0, inplace=True)
+                self.filter_df(train_df, self.drop_cols)
 
-            train_size = int(trn_idx.shape[0] * self.sample_ratio)
-            valid_size = int(val_idx.shape[0] * self.sample_ratio)
+            train_size = int(size * self.sample_ratio)
+            valid_size = int(size * self.sample_ratio)
 
             trn_idx = np.random.choice(trn_idx, train_size)
             val_idx = np.random.choice(val_idx, valid_size)
@@ -116,20 +121,19 @@ class NumeraiModel(NumeraiBaseEstimator):
             models.append(pickle.load(open(path, "rb")))
 
         valid = self.load_data(self.valid_data_path)
-        valid.drop(self.drop_cols, axis=1, inplace=True)
-        valid.fillna(0, inplace=True)
+        self.filter_df(valid, self.drop_cols)
+        size = valid.shape[0]
 
         preds_valid = np.zeros(valid.shape[0])
         logger.info("Predicting")
-        chunk_size = 200000
-        chunk_total = len(valid) // chunk_size + 1
+        chunk_total = len(valid) // self.chunk_size + 1
 
         for i, model in tqdm(enumerate(models), total=len(models), position=0):
             for chunk_num in tqdm(
                 range(chunk_total), total=chunk_total, position=1, leave=False
             ):
-                start_index = chunk_num * chunk_size
-                end_index = min(chunk_num * chunk_size + chunk_size, len(valid))
+                start_index = chunk_num * self.chunk_size
+                end_index = min(start_index + self.chunk_size, size)
                 chunk = valid[start_index:end_index]
                 preds_valid[start_index:end_index] += model.predict(
                     chunk[features].values
