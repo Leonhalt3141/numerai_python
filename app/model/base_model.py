@@ -1,6 +1,7 @@
 import pandas as pd
-from joblib import dump
+from joblib import dump, load
 from sklearn.base import BaseEstimator, RegressorMixin
+from xgboost import XGBRegressor
 
 
 class NumeraiBaseEstimator(BaseEstimator, RegressorMixin):
@@ -23,6 +24,9 @@ class NumeraiBaseEstimator(BaseEstimator, RegressorMixin):
 
     def save_model(self, model):
         dump(model, self.output_model_path)
+
+    def load_model(self, model_path: str) -> XGBRegressor:
+        return load(model_path)
 
     def fit(self, x, y=None):
         pass

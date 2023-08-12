@@ -25,7 +25,7 @@ class NumeraiModel(NumeraiBaseEstimator):
         live_data_path: str,
         valid_data_path: str,
         fold_num: int = 5,
-        sample_ratio: float = 0.5,
+        sample_ratio: float = 0.2,
         chunk_size=200000,
         target_col: str = "target",
         xgboost_params: dict = None,
