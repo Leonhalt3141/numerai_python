@@ -52,6 +52,9 @@ tzdata = "^2023.3"
 urllib3 = "^2.0.4"
 wcwidth = "^0.2.6"
 xgboost = "^1.7.6"
+matplotlib = "^3.7.2"
+seaborn = "^0.12.2"
+graphviz = "^0.20.1"
 
 
 [build-system]
