@@ -55,6 +55,7 @@ xgboost = "^1.7.6"
 matplotlib = "^3.7.2"
 seaborn = "^0.12.2"
 graphviz = "^0.20.1"
+optuna = "^3.3.0"
 
 
 [build-system]

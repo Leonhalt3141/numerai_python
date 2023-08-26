@@ -12,6 +12,7 @@ from tqdm import tqdm
 from xgboost import XGBRegressor
 
 from app.numerai_sbumit import submit
+from app.tune.bayesian_tuning import tune
 
 from .base_model import NumeraiBaseEstimator
 
@@ -21,9 +22,9 @@ logger = logging.getLogger()
 class NumeraiModel(NumeraiBaseEstimator):
     def __init__(
         self,
-        train_data_path: str,
-        live_data_path: str,
-        valid_data_path: str,
+        train_data_path: str = "train.parquet",
+        live_data_path: str = "live.parquet",
+        valid_data_path: str = "validation.parquet",
         fold_num: int = 5,
         sample_ratio: float = 0.2,
         chunk_size=200000,
@@ -121,6 +122,12 @@ class NumeraiModel(NumeraiBaseEstimator):
             models.append(pickle.load(open(path, "rb")))
 
         valid = self.load_data(self.valid_data_path)
+
+        if self.drop_cols is None:
+            self.drop_cols = [
+                col for col in valid.columns if "target" in col and col != "target"
+            ]
+
         self.filter_df(valid, self.drop_cols)
         size = valid.shape[0]
 
@@ -157,6 +164,50 @@ class NumeraiModel(NumeraiBaseEstimator):
         )
 
         return models, features, valid, preds_valid
+
+    def train_with_optuna(self):
+        logger.info("Load data")
+        train_df = self.load_data(self.train_data_path)
+        size = train_df.shape[0]
+
+        self.drop_cols = [
+            col for col in train_df.columns if "target" in col and col != "target"
+        ]
+        self.filter_df(train_df, self.drop_cols)
+
+        feature_cols = [col for col in train_df.columns if "feature" in col][:1205]
+        pickle.dump(feature_cols, open(self.list_feature_cols_file, "wb"))
+
+        train_size = int(size * self.sample_ratio)
+
+        trn_idx = np.random.randint(0, size, train_size)
+
+        trn_idx.sort()
+
+        trn_x = train_df.iloc[trn_idx, :][feature_cols].values
+        trn_y = train_df.iloc[trn_idx, :][self.target_col].values
+
+        logger.info("Set training")
+        study = tune(trn_x, trn_y, logger=logger.getChild("Optuna-Hyper Parameters"))
+        logger.info("End training")
+        logger.info("Export trained model")
+        best_params = {
+            "n_estimators": study.best_params["n_estimators"],
+            "boosting_type": "gbdt",
+            "learning_rate": 0.01,
+            "metric": "rmse",
+            "colsample_bytree": study.best_params["colsample_bytree"],
+            "max_bin": study.best_params["max_bin"],
+            "max_depth": study.best_params["max_depth"],
+            "min_child_weight": study.best_params["min_child_weight"],
+            "gamma": study.best_params["gamma"],
+            "reg_alpha": study.best_params["reg_alpha"],
+            "reg_lambda": study.best_params["reg_lambda"],
+        }
+        self.xgboost_params = best_params
+        del trn_x, trn_y, trn_idx
+        gc.collect()
+        self.train_model()
 
     def submission(self, models, features, valid, preds_valid, flag_submit):
         live = pd.read_parquet(self.live_data_path)
