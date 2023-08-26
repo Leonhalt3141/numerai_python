@@ -122,6 +122,12 @@ class NumeraiModel(NumeraiBaseEstimator):
             models.append(pickle.load(open(path, "rb")))
 
         valid = self.load_data(self.valid_data_path)
+
+        if self.drop_cols is None:
+            self.drop_cols = [
+                col for col in valid.columns if "target" in col and col != "target"
+            ]
+
         self.filter_df(valid, self.drop_cols)
         size = valid.shape[0]
 

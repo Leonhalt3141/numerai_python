@@ -49,7 +49,7 @@ class Objective:
         return scores["test_score"].mean()
 
 
-def tune(x, y, seed: int = 1, n_trials: int = 10, logger: Optional[Logger] = None):
+def tune(x, y, seed: int = 11, n_trials: int = 30, logger: Optional[Logger] = None):
     start_time = time.time()
     logger = logger if logger is not None else logging.getLogger()
 

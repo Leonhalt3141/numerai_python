@@ -1,3 +1,5 @@
+import os
+
 from numerapi import NumerAPI
 
 
@@ -6,26 +8,39 @@ class Downloader:
 
     @classmethod
     def download_train(cls):
-        cls.napi.download_dataset("v4.1/train_int8.parquet", "train.parquet")
+        train_path = "train.parquet"
+        if os.path.exists(train_path):
+            os.remove(train_path)
+        cls.napi.download_dataset("v4.1/train_int8.parquet", train_path)
 
     @classmethod
     def download_validation(cls):
-        cls.napi.download_dataset("v4.1/validation_int8.parquet", "validation.parquet")
+        validation_path = "validation.parquet"
+        if os.path.exists(validation_path):
+            os.remove(validation_path)
+        cls.napi.download_dataset("v4.1/validation_int8.parquet", validation_path)
 
     @classmethod
     def download_live(cls):
-        cls.napi.download_dataset("v4.1/live_int8.parquet", "live.parquet")
+        live_file = "live.parquet"
+        if os.path.exists(live_file):
+            os.remove(live_file)
+        cls.napi.download_dataset("v4.1/live_int8.parquet", live_file)
 
     @classmethod
     def download_live_example(cls):
-        cls.napi.download_dataset(
-            "v4.1/live_example_preds.parquet", "live_example_preds.parquet"
-        )
+        live_example = "live_example_preds.parquet"
+        if os.path.exists(live_example):
+            os.remove(live_example)
+        cls.napi.download_dataset("v4.1/live_example_preds.parquet", live_example)
 
     @classmethod
     def download_validation_example(cls):
+        validation_example = "validation_example_preds.parquet"
+        if os.path.exists(validation_example):
+            os.remove(validation_example)
         cls.napi.download_dataset(
-            "v4.1/validation_example_preds.parquet", "validation_example_preds.parquet"
+            "v4.1/validation_example_preds.parquet", validation_example
         )
 
     @classmethod
