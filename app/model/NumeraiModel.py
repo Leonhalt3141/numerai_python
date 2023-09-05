@@ -203,6 +203,7 @@ class NumeraiModel(NumeraiBaseEstimator):
             "gamma": study.best_params["gamma"],
             "reg_alpha": study.best_params["reg_alpha"],
             "reg_lambda": study.best_params["reg_lambda"],
+            "tree_method": "gpu_hist",
         }
         self.xgboost_params = best_params
         del trn_x, trn_y, trn_idx
