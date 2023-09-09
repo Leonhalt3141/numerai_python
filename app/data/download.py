@@ -4,6 +4,7 @@ from numerapi import NumerAPI
 
 
 class Downloader:
+    version = "v4.2"
     napi = NumerAPI()
 
     @classmethod
@@ -11,28 +12,32 @@ class Downloader:
         train_path = "train.parquet"
         if os.path.exists(train_path):
             os.remove(train_path)
-        cls.napi.download_dataset("v4.1/train_int8.parquet", train_path)
+        cls.napi.download_dataset(f"{cls.version}/train_int8.parquet", train_path)
 
     @classmethod
     def download_validation(cls):
         validation_path = "validation.parquet"
         if os.path.exists(validation_path):
             os.remove(validation_path)
-        cls.napi.download_dataset("v4.1/validation_int8.parquet", validation_path)
+        cls.napi.download_dataset(
+            f"{cls.version}/validation_int8.parquet", validation_path
+        )
 
     @classmethod
     def download_live(cls):
         live_file = "live.parquet"
         if os.path.exists(live_file):
             os.remove(live_file)
-        cls.napi.download_dataset("v4.1/live_int8.parquet", live_file)
+        cls.napi.download_dataset(f"{cls.version}/live_int8.parquet", live_file)
 
     @classmethod
     def download_live_example(cls):
         live_example = "live_example_preds.parquet"
         if os.path.exists(live_example):
             os.remove(live_example)
-        cls.napi.download_dataset("v4.1/live_example_preds.parquet", live_example)
+        cls.napi.download_dataset(
+            f"{cls.version}/live_example_preds.parquet", live_example
+        )
 
     @classmethod
     def download_validation_example(cls):
@@ -40,16 +45,18 @@ class Downloader:
         if os.path.exists(validation_example):
             os.remove(validation_example)
         cls.napi.download_dataset(
-            "v4.1/validation_example_preds.parquet", validation_example
+            f"{cls.version}/validation_example_preds.parquet", validation_example
         )
 
     @classmethod
     def download_features(cls):
-        cls.napi.download_dataset("v4.1/features.json", "features.json")
+        cls.napi.download_dataset(f"{cls.version}/features.json", "features.json")
 
     @classmethod
     def download_meta_model(cls):
-        cls.napi.download_dataset("v4.1/meta_model.parquet", "meta_model.parquet")
+        cls.napi.download_dataset(
+            f"{cls.version}/meta_model.parquet", "meta_model.parquet"
+        )
 
     @classmethod
     def download_all(cls):
