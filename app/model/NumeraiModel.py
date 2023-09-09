@@ -15,6 +15,7 @@ from app.numerai_sbumit import submit
 from app.tune.bayesian_tuning import tune
 
 from .base_model import NumeraiBaseEstimator
+from .feature_selection import FeatureSelection
 
 logger = logging.getLogger()
 
@@ -35,6 +36,7 @@ class NumeraiModel(NumeraiBaseEstimator):
         self.sample_ratio = sample_ratio
         self.target_col = target_col
         self.chunk_size = chunk_size
+        self.feature_size = 1205
         if xgboost_params is None:
             self.xgboost_params = {
                 "n_estimators": 3000,
@@ -69,8 +71,13 @@ class NumeraiModel(NumeraiBaseEstimator):
         ]
         self.filter_df(train_df, self.drop_cols)
 
-        feature_cols = [col for col in train_df.columns if "feature" in col][:1205]
+        feature_cols = FeatureSelection.select_features_by_size(
+            self.target_col, self.feature_size
+        ).tolist()
+        # feature_cols = [col for col in train_df.columns if "feature" in col][:self.feature_size]
+
         pickle.dump(feature_cols, open(self.list_feature_cols_file, "wb"))
+        train_df = train_df[feature_cols + [self.target_col]]
 
         cv = KFold(n_splits=self.fold_num)
         pbar = tqdm(cv.split(train_df), total=self.fold_num)
@@ -116,6 +123,9 @@ class NumeraiModel(NumeraiBaseEstimator):
 
     def valid_data_prediction(self):
         features = pickle.load(open(self.list_feature_cols_file, "rb"))
+        # feature_cols = FeatureSelection.select_features_by_size(
+        #     self.target_col, self.feature_size
+        # ).tolist()
         models = []
 
         for path in glob.glob("model.lgb.fold_*.pkl"):
@@ -135,10 +145,9 @@ class NumeraiModel(NumeraiBaseEstimator):
         logger.info("Predicting")
         chunk_total = len(valid) // self.chunk_size + 1
 
-        for i, model in tqdm(enumerate(models), total=len(models), position=0):
-            for chunk_num in tqdm(
-                range(chunk_total), total=chunk_total, position=1, leave=False
-            ):
+        for i, model in enumerate(models):
+            logger.info(f"{i + 1}/{len(models)}")
+            for chunk_num in tqdm(range(chunk_total), total=chunk_total, position=1):
                 start_index = chunk_num * self.chunk_size
                 end_index = min(start_index + self.chunk_size, size)
                 chunk = valid[start_index:end_index]
@@ -175,7 +184,10 @@ class NumeraiModel(NumeraiBaseEstimator):
         ]
         self.filter_df(train_df, self.drop_cols)
 
-        feature_cols = [col for col in train_df.columns if "feature" in col][:1205]
+        feature_cols = FeatureSelection.select_features_by_size(
+            self.target_col, self.feature_size
+        ).tolist()
+        # feature_cols = [col for col in train_df.columns if "feature" in col][:self.feature_size]
         pickle.dump(feature_cols, open(self.list_feature_cols_file, "wb"))
 
         train_size = int(size * self.sample_ratio)
