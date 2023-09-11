@@ -147,7 +147,7 @@ class NumeraiModel(NumeraiBaseEstimator):
 
         for i, model in enumerate(models):
             logger.info(f"{i + 1}/{len(models)}")
-            for chunk_num in tqdm(range(chunk_total), total=chunk_total, position=1):
+            for chunk_num in tqdm(range(chunk_total), total=chunk_total):
                 start_index = chunk_num * self.chunk_size
                 end_index = min(start_index + self.chunk_size, size)
                 chunk = valid[start_index:end_index]
