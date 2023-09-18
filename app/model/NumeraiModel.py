@@ -162,12 +162,18 @@ class NumeraiModel(NumeraiBaseEstimator):
             d[era] = st.spearmanr(
                 valid.query("era == @era")["prediction"],
                 valid.query("era == @era")["target"],
+                nan_policy="omit",
             )[0]
 
         s = pd.Series(d)
-        mean = s.mean()
-        std = s.std()
+
+        logger.info(s)
+        mean = np.nanmean(s.values)
+        std = np.nanstd(s.values)
         sharpe_ratio = mean / std
+        print(
+            f"Mean: {round(mean, 3)}, S.D.: {round(std, 3)}, Sharpe ratio: {round(sharpe_ratio, 3)}"
+        )
         logger.info(
             f"Mean: {round(mean, 3)}, S.D.: {round(std, 3)}, Sharpe ratio: {round(sharpe_ratio, 3)}"
         )
