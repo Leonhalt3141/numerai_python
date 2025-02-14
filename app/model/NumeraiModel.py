@@ -2,22 +2,23 @@ import gc
 import glob
 import logging
 import pickle
+from typing import List
 
 import joblib
 import numpy as np
 import pandas as pd
 import scipy.stats as st
+from app.numerai_sbumit import submit
+from app.tune.bayesian_tuning import tune
 from sklearn.model_selection import KFold
 from tqdm import tqdm
 from xgboost import XGBRegressor
-
-from app.numerai_sbumit import submit
-from app.tune.bayesian_tuning import tune
 
 from .base_model import NumeraiBaseEstimator
 from .feature_selection import FeatureSelection
 
 logger = logging.getLogger()
+generator = np.random.Generator(np.random.PCG64(seed=0))
 
 
 class NumeraiModel(NumeraiBaseEstimator):
@@ -74,12 +75,11 @@ class NumeraiModel(NumeraiBaseEstimator):
         feature_cols = FeatureSelection.select_features_by_size(
             self.target_col, self.feature_size
         ).tolist()
-        # feature_cols = [col for col in train_df.columns if "feature" in col][:self.feature_size]
 
         pickle.dump(feature_cols, open(self.list_feature_cols_file, "wb"))
         train_df = train_df[feature_cols + [self.target_col]]
 
-        cv = KFold(n_splits=self.fold_num)
+        cv = KFold(n_splits=self.fold_num, random_state=0, shuffle=True)
         pbar = tqdm(cv.split(train_df), total=self.fold_num)
         for fold, (trn_idx, val_idx) in tqdm(
             enumerate(pbar, start=1), total=self.fold_num
@@ -91,8 +91,8 @@ class NumeraiModel(NumeraiBaseEstimator):
             train_size = int(size * self.sample_ratio)
             valid_size = int(size * self.sample_ratio)
 
-            trn_idx = np.random.choice(trn_idx, train_size)
-            val_idx = np.random.choice(val_idx, valid_size)
+            trn_idx = generator.choice(trn_idx, train_size)
+            val_idx = generator.choice(val_idx, valid_size)
             trn_idx.sort()
             val_idx.sort()
 
@@ -180,7 +180,7 @@ class NumeraiModel(NumeraiBaseEstimator):
 
         return models, features, valid, preds_valid
 
-    def train_with_optuna(self):
+    def train_with_optuna(self, feature_cols: List[str]):
         logger.info("Load data")
         train_df = self.load_data(self.train_data_path)
         size = train_df.shape[0]
@@ -190,15 +190,9 @@ class NumeraiModel(NumeraiBaseEstimator):
         ]
         self.filter_df(train_df, self.drop_cols)
 
-        feature_cols = FeatureSelection.select_features_by_size(
-            self.target_col, self.feature_size
-        ).tolist()
-        # feature_cols = [col for col in train_df.columns if "feature" in col][:self.feature_size]
-        pickle.dump(feature_cols, open(self.list_feature_cols_file, "wb"))
-
         train_size = int(size * self.sample_ratio)
 
-        trn_idx = np.random.randint(0, size, train_size)
+        trn_idx = generator.integers(0, size, train_size)
 
         trn_idx.sort()
 
