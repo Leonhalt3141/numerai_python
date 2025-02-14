@@ -1,5 +1,4 @@
 from sklearn.pipeline import Pipeline
-from xgboost import XGBRegressor
 
 
 def build_pipeline(estimator_cls, estimator_params: dict):
