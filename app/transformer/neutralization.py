@@ -15,18 +15,38 @@ def neutralize_function(
     return neutralized
 
 
-class CustomNeutralizer(BaseEstimator, TransformerMixin):
-    def __init__(self, prediction_col: str, features: list[str], proportion: float):
-        self.prediction_col = prediction_col
+class FeatureNeutralizer(BaseEstimator, TransformerMixin):
+    """
+    Transformer for feature neutralization in scikit-learn pipelines.
+    """
+
+    def __init__(self, features: list[str], proportion=1.0):
         self.features = features
         self.proportion = proportion
 
+    def neutralize(self, predictions, features):
+        """
+        Apply feature neutralization to predictions.
+        """
+        scores = predictions.reshape(-1, 1)
+        exposures = np.linalg.pinv(features.T @ features) @ (features.T @ scores)
+        neutralized = scores - self.proportion * (features @ exposures)
+        return neutralized.flatten()
+
     def fit(self, x, y=None):
+        # No fitting needed, returns self
         return self
 
-    def transform(self, x: pd.DataFrame):
-        return x.groupby("era", group_keys=True).apply(
-            lambda d: neutralize_function(
-                d, self.prediction_col, self.features, self.proportion
-            )
+    def transform(self, x):
+        """
+        x is expected to be a DataFrame where:
+        - The last column is the predictions (from a model).
+        - The remaining columns are the features.
+        """
+        neutralized_preds = neutralize_function(
+            x, "prediction", self.features, self.proportion
         )
+
+        # 予測値を更新して DataFrame に戻す
+        x.iloc[:, -1] = neutralized_preds
+        return x
