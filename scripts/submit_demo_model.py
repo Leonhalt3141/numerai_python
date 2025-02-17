@@ -86,7 +86,7 @@ def predict_neutral(live_features: pd.DataFrame) -> pd.DataFrame:
 
 
 ##
-live_features = pd.read_parquet("data/live.parquet", columns=medium_features)
+live_features = pd.read_parquet("../data/live.parquet", columns=medium_features)
 
 ##
 predict_neutral(live_features)
