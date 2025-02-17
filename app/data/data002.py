@@ -13,13 +13,12 @@ def prepare_data(test_size: float = 0.2, logger: Optional[Logger] = None):
     with open("data/features.json") as f:
         feature_metadata = json.load(f)
 
-    features = feature_metadata["feature_sets"]["medium"]
+    features = ["era"] + feature_metadata["feature_sets"]["medium"]
 
     logger_info("Loading data")
 
-    train_df = pd.read_parquet(
-        "data/train.parquet", columns=["era"] + features + ["target"]
-    )
+    train_df = pd.read_parquet("data/train.parquet", columns=features + ["target"])
+    train_df["era"] = train_df["era"].astype(int)
     x = train_df[features]
     y = train_df[["target"]]
 
