@@ -72,7 +72,8 @@ def submission(
     live_df: Optional[pd.DataFrame] = None,
     valid_df: Optional[pd.DataFrame] = None,
     model_name="kuwaken_gbt",
-    flag_submit="live",
+    live_flag=True,
+    valid_flag=True,
 ):
     live_df = live_df if live_df is not None else live_predict()
     valid_df = valid_df if valid_df is not None else valid_predict()
@@ -84,25 +85,14 @@ def submission(
     valid_sub_df.to_csv(f"preds_valid_{model_name}.csv", index=False)
 
     # Upload your predictions using API
-    if flag_submit == "valid,live":
+    if valid_flag:
         napi = numerapi.NumerAPI(public_id=public_id, secret_key=secret_key)
         model_id = napi.get_models()[model_name]
         submission_id = napi.upload_diagnostics(
             f"preds_valid_{model_name}.csv", model_id=model_id
         )
         print(submission_id)
-        submission_id = napi.upload_predictions(
-            f"preds_live_{model_name}.csv", model_id=model_id
-        )
-        print(submission_id)
-    elif flag_submit == "valid":
-        napi = numerapi.NumerAPI(public_id=public_id, secret_key=secret_key)
-        model_id = napi.get_models()[model_name]
-        submission_id = napi.upload_diagnostics(
-            f"preds_valid_{model_name}.csv", model_id=model_id
-        )
-        print(submission_id)
-    elif flag_submit == "live":
+    if live_flag:
         napi = numerapi.NumerAPI(public_id=public_id, secret_key=secret_key)
         model_id = napi.get_models()[model_name]
         submission_id = napi.upload_predictions(
