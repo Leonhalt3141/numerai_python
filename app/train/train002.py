@@ -41,8 +41,9 @@ def objective(trial: Trial, x_data, y_data, features):
     estimator, params = get_estimator_params(trial)
 
     proportion = trial.suggest_float("proportion", 0.1, 1)
+    neutralize_flag = trial.suggest_categorical("neutralize_flag", [True, False])
 
-    pipeline = build_pipeline(features, estimator, params, proportion)
+    pipeline = build_pipeline(features, estimator, params, proportion, neutralize_flag)
 
     pipeline.fit(x_data, y_data)
 

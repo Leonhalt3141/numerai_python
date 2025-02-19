@@ -6,10 +6,17 @@ from sklearn.pipeline import Pipeline
 
 
 class CustomPipeline(Pipeline):
-    def __init__(self, steps: list[Any], proportion: float, features: list[str]):
+    def __init__(
+        self,
+        steps: list[Any],
+        proportion: float,
+        features: list[str],
+        neutralize_flag: bool,
+    ):
         super().__init__(steps)
         self.proportion = proportion
         self.features = features
+        self.neutralize_flag = neutralize_flag
 
     def neutralize(self, x: pd.DataFrame):
         neutralizer = FeatureNeutralizer(
@@ -36,12 +43,20 @@ class CustomPipeline(Pipeline):
 
         # Step 2: Apply neutralization
         x["prediction"] = predictions
-        neutralized_predictions = self.neutralize(x)
-        return neutralized_predictions
+
+        if self.neutralize_flag:
+            neutralized_predictions = self.neutralize(x)
+            return neutralized_predictions
+
+        return predictions
 
 
 def build_pipeline(
-    features: list[str], estimator_cls, estimator_params: dict, proportion: float
+    features: list[str],
+    estimator_cls,
+    estimator_params: dict,
+    proportion: float,
+    neutralize_flag: bool,
 ):
     estimator = estimator_cls(**estimator_params)
     return CustomPipeline(
@@ -50,4 +65,5 @@ def build_pipeline(
         ],
         proportion=proportion,
         features=features,
+        neutralize_flag=neutralize_flag,
     )
