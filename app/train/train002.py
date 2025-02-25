@@ -28,8 +28,12 @@ logger = get_logger(
 
 
 def evaluate(predictions, targets):
-    rmse = root_mean_squared_error(y_true=targets, y_pred=predictions)
-    return rmse
+    # rmse = root_mean_squared_error(y_true=targets, y_pred=predictions)
+    predictions["target"] = targets
+    corr = predictions.groupby("era").apply(_score)
+    sharpe_ratio_value = calculate_sharpe_ratio(corr)
+
+    return sharpe_ratio_value
 
 
 def _score(sub_df: pd.DataFrame) -> np.float32:
@@ -48,13 +52,14 @@ def objective(trial: Trial, x_data, y_data, features):
     pipeline.fit(x_data, y_data)
 
     predictions = pipeline.predict(x_data[features])
-    return evaluate(predictions["prediction"].values, y_data.values)
+    # return evaluate(predictions["prediction"].values, y_data.values)
+    return evaluate(predictions, y_data)
 
 
 def train(x_train, y_train, x_test, y_test, features):
     logger.info("Create Optuna study")
 
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(direction="maximize")
 
     logger.info("Start Optuna optimize")
     study.optimize(
@@ -78,7 +83,11 @@ def train(x_train, y_train, x_test, y_test, features):
     logger.info("Loading optimal parameters and setting optimal estimator pipeline.")
     estimator_params = get_estimator_params_from_trial(best_trial)
     optimal_pipeline = build_pipeline(
-        features, XGBRegressor, estimator_params, best_trial.params.get("proportion")
+        features,
+        XGBRegressor,
+        estimator_params,
+        best_trial.params.get("proportion"),
+        best_trial.params.get("neutralize_flag"),
     )
     optimal_pipeline.fit(x_train, y_train)
 

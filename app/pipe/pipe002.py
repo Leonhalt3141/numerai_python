@@ -42,13 +42,14 @@ class CustomPipeline(Pipeline):
         predictions = super().predict(x)
 
         # Step 2: Apply neutralization
-        x["prediction"] = predictions
 
         if self.neutralize_flag:
+            x["prediction"] = predictions
             neutralized_predictions = self.neutralize(x)
             return neutralized_predictions
 
-        return predictions
+        x["prediction"] = predictions
+        return x
 
 
 def build_pipeline(

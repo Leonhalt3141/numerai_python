@@ -75,17 +75,14 @@ def submission(
     live_flag=True,
     valid_flag=True,
 ):
-    live_df = live_df if live_df is not None else live_predict()
-    valid_df = valid_df if valid_df is not None else valid_predict()
-
-    live_sub_df = live_df[["prediction"]].reset_index()
-    live_sub_df.to_csv(f"preds_live_{model_name}.csv", index=False)
-
-    valid_sub_df = valid_df[["prediction"]].reset_index()
-    valid_sub_df.to_csv(f"preds_valid_{model_name}.csv", index=False)
 
     # Upload your predictions using API
     if valid_flag:
+        valid_df = valid_df if valid_df is not None else valid_predict()
+
+        valid_sub_df = valid_df[["prediction"]].reset_index()
+        valid_sub_df.to_csv(f"preds_valid_{model_name}.csv", index=False)
+
         napi = numerapi.NumerAPI(public_id=public_id, secret_key=secret_key)
         model_id = napi.get_models()[model_name]
         submission_id = napi.upload_diagnostics(
@@ -93,6 +90,11 @@ def submission(
         )
         print(submission_id)
     if live_flag:
+        live_df = live_df if live_df is not None else live_predict()
+
+        live_sub_df = live_df[["prediction"]].reset_index()
+        live_sub_df.to_csv(f"preds_live_{model_name}.csv", index=False)
+
         napi = numerapi.NumerAPI(public_id=public_id, secret_key=secret_key)
         model_id = napi.get_models()[model_name]
         submission_id = napi.upload_predictions(
