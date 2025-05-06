@@ -1,6 +1,7 @@
 import datetime
 from uuid import uuid4
 
+import numpy as np
 import optuna
 import pandas as pd
 from app.data.data_import import open_train_data, read_features
@@ -18,7 +19,9 @@ seed = 123
 train_name = "train003"
 uid = uuid4().hex
 start_time = datetime.datetime.now()
-n_trials = 5
+n_trials = 1
+sub_target_num = 2
+np_gen = np.random.Generator(np.random.PCG64(seed=0))
 
 logger = get_logger(
     name=train_name,
@@ -146,18 +149,27 @@ def train_all_sub_models(train_x, test_x, train_y, test_y, sub_target_array, fea
 
 
 def main():
-    sub_target_array = select_sub_target_array()
+    try:
+        sub_target_array = select_sub_target_array()
 
-    feature_metadata = read_features()
-    features = ["era"] + feature_metadata["feature_sets"]["medium"]
+        sub_target_array = (
+            np_gen.choice(sub_target_array, size=5, replace=False)
+            if sub_target_num != -1
+            else sub_target_array
+        )
 
-    train_df = pd.read_parquet(
-        "data/train.parquet", columns=features + sub_target_array.tolist()
-    )
-    train_df["era"] = train_df["era"].astype(int)
-    x = train_df[features]
-    y = train_df[sub_target_array]
-    train_x, test_x, train_y, test_y = train_test_split(
-        x, y, test_size=0.2, random_state=seed
-    )
-    train_all_sub_models(train_x, test_x, train_y, test_y, sub_target_array, features)
+        feature_metadata = read_features()
+        features = ["era"] + feature_metadata["feature_sets"]["medium"]
+
+        train_df = pd.read_parquet(
+            "data/train.parquet", columns=features + sub_target_array.tolist()
+        )
+        train_df["era"] = train_df["era"].astype(int)
+        x = train_df[features]
+        y = train_df[sub_target_array]
+        train_x, test_x, train_y, test_y = train_test_split(
+            x, y, test_size=0.2, random_state=seed
+        )
+        train_all_sub_models(train_x, test_x, train_y, test_y, sub_target_array, features)
+    except Exception as e:
+        logger.error(e)
