@@ -2,16 +2,13 @@ import datetime
 from uuid import uuid4
 
 import joblib
-import numpy as np
 import optuna
-import pandas as pd
 from app.data.data002 import prepare_data
 from app.logger.log import get_logger
-from app.metrics.scoring import calculate_sharpe_ratio
+from app.metrics.scoring import _score, calculate_sharpe_ratio, evaluate_sharpe_ratio
 from app.model.model002 import get_estimator_params, get_estimator_params_from_trial
 from app.pipe.pipe002 import build_pipeline
 from optuna import Trial
-from scipy.stats import spearmanr
 from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
 from xgboost import XGBRegressor
 
@@ -27,16 +24,6 @@ logger = get_logger(
 )
 
 
-def evaluate(predictions, targets):
-    rmse = root_mean_squared_error(y_true=targets, y_pred=predictions)
-    return rmse
-
-
-def _score(sub_df: pd.DataFrame) -> np.float32:
-    """Calculates Spearman correlation"""
-    return spearmanr(sub_df["target"], sub_df["prediction"])[0]
-
-
 def objective(trial: Trial, x_data, y_data, features):
     estimator, params = get_estimator_params(trial)
 
@@ -48,13 +35,13 @@ def objective(trial: Trial, x_data, y_data, features):
     pipeline.fit(x_data, y_data)
 
     predictions = pipeline.predict(x_data[features])
-    return evaluate(predictions["prediction"].values, y_data.values)
+    return evaluate_sharpe_ratio(predictions, y_data)
 
 
 def train(x_train, y_train, x_test, y_test, features):
     logger.info("Create Optuna study")
 
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(direction="maximize")
 
     logger.info("Start Optuna optimize")
     study.optimize(
@@ -78,7 +65,11 @@ def train(x_train, y_train, x_test, y_test, features):
     logger.info("Loading optimal parameters and setting optimal estimator pipeline.")
     estimator_params = get_estimator_params_from_trial(best_trial)
     optimal_pipeline = build_pipeline(
-        features, XGBRegressor, estimator_params, best_trial.params.get("proportion")
+        features,
+        XGBRegressor,
+        estimator_params,
+        best_trial.params.get("proportion"),
+        best_trial.params.get("neutralize_flag"),
     )
     optimal_pipeline.fit(x_train, y_train)
 
@@ -110,7 +101,7 @@ def train(x_train, y_train, x_test, y_test, features):
 def main():
     try:
         train_x, test_x, train_y, test_y, features = prepare_data(
-            test_size=0.2, logger=logger
+            test_size=0.2, logger=logger, seed=seed
         )
 
         logger.info("Start training")

@@ -7,16 +7,24 @@ import numerapi
 import pandas as pd
 from sklearn.pipeline import Pipeline
 
+from ..data.data_import import read_features
 from . import public_id, secret_key
 
-model_id = "002"
+model_id = "003"
 feature_type = "medium"
 target_col = "target"
+feature_metadata = read_features()
+features = ["era"] + feature_metadata["feature_sets"]["medium"]
 
 
-def load_latest_model():
-    model_filename = sorted(glob(f"model/*train{model_id}_model.pkl"))[-1]
-    return joblib.load(model_filename)
+def get_latest_sub_models():
+    latest_datetime = (
+        sorted(glob(f"model/*train{model_id}_model.pkl"))[-1]
+        .split("_")[-1]
+        .split(".")[0]
+        .split("_")[0]
+    )
+    return sorted(glob(f"model/{latest_datetime}*train{model_id}_model.pkl"))[-1]
 
 
 def load_live_data() -> pd.DataFrame:
@@ -43,27 +51,35 @@ def load_valid_data() -> (pd.DataFrame, list[str]):
     return df, features
 
 
-def live_predict(
-    model: Optional[Pipeline] = None, live_df: Optional[pd.DataFrame] = None
-):
-    model = model if model is not None else load_latest_model()
+def predict(df: pd.DataFrame):
+    predictions = pd.DataFrame(index=features)
+
+    sub_model_files = get_latest_sub_models()
+    for sub_model_file in sub_model_files:
+        sub_model = joblib.load(sub_model_file)
+        sub_target = "_".join(sub_model_file.split(".")[0].split("_")[-4:-3])
+        predictions[sub_target] = sub_model.predict(df[features])
+
+    ensemble = predictions.rank(pct=True).mean(axis=1)
+    return ensemble
+
+
+def live_predict(live_df: Optional[pd.DataFrame] = None):
     live_df = live_df if live_df is not None else load_live_data()
 
-    predictions = model.predict(live_df)
+    predictions = predict(live_df)
     return predictions
 
 
 def valid_predict(
-    model: Optional[Pipeline] = None,
     features: Optional[list[str]] = None,
     valid_df: Optional[pd.DataFrame] = None,
 ):
-    model = model if model is not None else load_latest_model()
 
     if valid_df is None and features is None:
         valid_df, features = load_valid_data()
 
-    predictions = model.predict(valid_df[features])
+    predictions = predict(valid_df)
     predictions[target_col] = valid_df[target_col]
     return predictions
 
